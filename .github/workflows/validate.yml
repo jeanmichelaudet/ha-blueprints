@@ -55,6 +55,16 @@ jobs:
           import sys
           from pathlib import Path
 
+          # Custom loader to handle Home Assistant's !input tag
+          class HALoader(yaml.SafeLoader):
+              pass
+
+          def input_constructor(loader, node):
+              """Handle !input tags by returning a placeholder."""
+              return f"!input:{loader.construct_scalar(node)}"
+
+          HALoader.add_constructor('!input', input_constructor)
+
           REQUIRED_FIELDS = ['name', 'description', 'domain', 'author']
           VALID_DOMAINS = ['automation', 'script', 'scene']
 
@@ -69,7 +79,7 @@ jobs:
               print(f"Validating: {bp_path}")
               try:
                   with open(bp_path) as f:
-                      content = yaml.safe_load(f)
+                      content = yaml.load(f, Loader=HALoader)
 
                   if not content or 'blueprint' not in content:
                       errors.append(f"{bp_path}: Missing 'blueprint' key")
