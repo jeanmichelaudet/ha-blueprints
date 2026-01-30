@@ -1,0 +1,102 @@
+blueprint:
+  name: Aqara Switch Actions with Matter
+  description: |
+    Handle different actions for an Aqara switch button using Matter protocol.
+    
+    **Supported events:** Single press, Double press, Long press, Long release
+    
+    **Note:** Automatically filters out unavailable/unknown state transitions to prevent false triggers during hub reconnections.
+  domain: automation
+  author: J-M Audet
+  source_url: https://github.com/jeanmichelaudet/ha-blueprints/blob/main/automation/aqara-switch-matter.yaml
+  homeassistant:
+    min_version: "2022.5.0"
+  input:
+    switch_section:
+      name: Device
+      icon: mdi:light-switch
+      description: Select the Aqara switch to monitor
+      collapsed: false
+      input:
+        switch_entity:
+          name: Switch Entity
+          description: The Aqara switch button entity (event domain)
+          selector:
+            entity:
+              filter:
+                domain: event
+                device_class: button
+    actions_section:
+      name: Actions
+      icon: mdi:gesture-tap
+      description: Configure at least one action
+      collapsed: false
+      input:
+        single_press_action:
+          name: Single Press
+          description: Action on single press (multi_press_1)
+          default: []
+          selector:
+            action: {}
+        double_press_action:
+          name: Double Press
+          description: Action on double press (multi_press_2)
+          default: []
+          selector:
+            action: {}
+        long_press_action:
+          name: Long Press
+          description: Action when button is held (long_press)
+          default: []
+          selector:
+            action: {}
+        long_release_action:
+          name: Long Release
+          description: Action when button is released after hold (long_release)
+          default: []
+          selector:
+            action: {}
+
+variables:
+  event_type: "{{ trigger.to_state.attributes.event_type }}"
+  valid_events:
+    - multi_press_1
+    - multi_press_2
+    - long_press
+    - long_release
+
+trigger:
+  - platform: state
+    entity_id: !input switch_entity
+    not_from:
+      - "unavailable"
+      - "unknown"
+    not_to:
+      - "unavailable"
+      - "unknown"
+
+condition:
+  - condition: template
+    value_template: "{{ event_type in valid_events }}"
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'multi_press_1' }}"
+        sequence: !input single_press_action
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'multi_press_2' }}"
+        sequence: !input double_press_action
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'long_press' }}"
+        sequence: !input long_press_action
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'long_release' }}"
+        sequence: !input long_release_action
+
+mode: single
+max_exceeded: silent

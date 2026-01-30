@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python (if using validation scripts)
+__pycache__/
+*.py[cod]
+.env
+venv/
+
+# Home Assistant secrets (never commit)
+secrets.yaml
+*.secret.yaml
+
+# Local testing
+.local/
+test/
+*.log
+
+# Backup files
+*.bak
+*.backup
+*.orig
