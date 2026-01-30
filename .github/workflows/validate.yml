@@ -1,0 +1,115 @@
+name: Validate Blueprints
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "blueprints/**/*.yaml"
+      - ".github/workflows/validate.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "blueprints/**/*.yaml"
+      - ".github/workflows/validate.yml"
+
+jobs:
+  yaml-lint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run YAML Lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: blueprints/
+          config_data: |
+            extends: relaxed
+            rules:
+              line-length: disable
+              comments:
+                min-spaces-from-content: 1
+              truthy:
+                check-keys: false
+
+  validate-structure:
+    name: Validate Blueprint Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate blueprint structure
+        run: |
+          python << 'EOF'
+          import yaml
+          import sys
+          from pathlib import Path
+
+          # Custom loader to handle Home Assistant's !input tag
+          class HALoader(yaml.SafeLoader):
+              pass
+
+          def input_constructor(loader, node):
+              """Handle !input tags by returning a placeholder."""
+              return f"!input:{loader.construct_scalar(node)}"
+
+          HALoader.add_constructor('!input', input_constructor)
+
+          REQUIRED_FIELDS = ['name', 'description', 'domain', 'author']
+          VALID_DOMAINS = ['automation', 'script', 'scene']
+
+          errors = []
+          blueprints = list(Path('blueprints').rglob('*.yaml'))
+
+          if not blueprints:
+              print("No blueprint files found")
+              sys.exit(0)
+
+          for bp_path in blueprints:
+              print(f"Validating: {bp_path}")
+              try:
+                  with open(bp_path) as f:
+                      content = yaml.load(f, Loader=HALoader)
+
+                  if not content or 'blueprint' not in content:
+                      errors.append(f"{bp_path}: Missing 'blueprint' key")
+                      continue
+
+                  bp = content['blueprint']
+
+                  for field in REQUIRED_FIELDS:
+                      if field not in bp:
+                          errors.append(f"{bp_path}: Missing required field '{field}'")
+
+                  if 'domain' in bp and bp['domain'] not in VALID_DOMAINS:
+                      errors.append(f"{bp_path}: Invalid domain '{bp['domain']}'")
+
+                  if 'input' in bp:
+                      print(f"  - Found {len(bp['input'])} input section(s)")
+
+                  print(f"  - Domain: {bp.get('domain', 'N/A')}")
+                  print(f"  - Author: {bp.get('author', 'N/A')}")
+
+              except yaml.YAMLError as e:
+                  errors.append(f"{bp_path}: YAML parse error - {e}")
+              except Exception as e:
+                  errors.append(f"{bp_path}: {e}")
+
+          if errors:
+              print("\nValidation errors:")
+              for error in errors:
+                  print(f"  - {error}")
+              sys.exit(1)
+
+          print(f"\nValidated {len(blueprints)} blueprint(s) successfully")
+          EOF
