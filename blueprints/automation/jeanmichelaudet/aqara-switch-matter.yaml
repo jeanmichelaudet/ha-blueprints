@@ -1,14 +1,20 @@
+# Aqara Switch Matter Blueprint
+# Version: 1.1.0
+# Changelog:
+#   1.1.0 - Restructured repository, added configurable automation mode
+#   1.0.0 - Initial release
+
 blueprint:
   name: Aqara Switch Actions with Matter
   description: |
     Handle different actions for an Aqara switch button using Matter protocol.
-    
+
     **Supported events:** Single press, Double press, Long press, Long release
-    
+
     **Note:** Automatically filters out unavailable/unknown state transitions to prevent false triggers during hub reconnections.
   domain: automation
   author: J-M Audet
-  source_url: https://github.com/jeanmichelaudet/ha-blueprints/blob/main/automation/aqara-switch-matter.yaml
+  source_url: https://github.com/jeanmichelaudet/ha-blueprints/blob/main/blueprints/automation/jeanmichelaudet/aqara-switch-matter.yaml
   homeassistant:
     min_version: "2022.5.0"
   input:
@@ -56,6 +62,32 @@ blueprint:
           default: []
           selector:
             action: {}
+    options_section:
+      name: Options
+      icon: mdi:cog
+      description: Advanced configuration options
+      collapsed: true
+      input:
+        automation_mode:
+          name: Automation Mode
+          description: |
+            How to handle multiple triggers:
+            - **single**: Ignore new triggers while running
+            - **restart**: Restart automation on new trigger
+            - **queued**: Queue triggers and run sequentially
+            - **parallel**: Run multiple instances simultaneously
+          default: single
+          selector:
+            select:
+              options:
+                - label: Single (ignore new triggers)
+                  value: single
+                - label: Restart (cancel and restart)
+                  value: restart
+                - label: Queued (run sequentially)
+                  value: queued
+                - label: Parallel (run simultaneously)
+                  value: parallel
 
 variables:
   event_type: "{{ trigger.to_state.attributes.event_type }}"
@@ -98,5 +130,5 @@ action:
             value_template: "{{ event_type == 'long_release' }}"
         sequence: !input long_release_action
 
-mode: single
+mode: !input automation_mode
 max_exceeded: silent
